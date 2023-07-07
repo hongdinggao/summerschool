@@ -349,6 +349,28 @@ See [the MPI debugging exercise](mpi/debugging),
 for possible debugging options.
 
 ## Performance analysis with TAU and Omniperf
+```
+# Create installation directory
+mkdir -p .../appl/tau
+cd .../appl/tau
+
+# Download TAU
+wget https://www.cs.uoregon.edu/research/tau/tau_releases/tau-2.32.tar.gz
+tar xvf tau-2.32.tar.gz
+mv tau-2.32 2.32
+
+# Go to TAU directory
+cd 2.32
+
+./configure -bfd=download -otf=download -unwind=download -dwarf=download -iowrapper -cc=cc -c++=CC -fortran=ftn -pthread -mpi -phiprof -papi=/opt/cray/pe/papi/6.0.0.15/
+make -j 64
+
+./configure -bfd=download -otf=download -unwind=download -dwarf=download -iowrapper -cc=cc -c++=CC -fortran=ftn -pthread -mpi -papi=/opt/cray/pe/papi/6.0.0.15/ -rocm=/appl/lumi/SW/LUMI-22.08/G/EB/rocm/5.3.3/ -rocprofiler=/appl/lumi/SW/LUMI-22.08/G/EB/rocm/5.3.3/rocprofiler
+make -j 64
+
+./configure -bfd=download -otf=download -unwind=download -dwarf=download -iowrapper -cc=cc -c++=CC -fortran=ftn -pthread -mpi -papi=/opt/cray/pe/papi/6.0.0.15/ -rocm=/appl/lumi/SW/LUMI-22.08/G/EB/rocm/5.3.3/ -roctracer=/appl/lumi/SW/LUMI-22.08/G/EB/rocm/5.3.3/roctracer
+make -j 64
+```
 
 `TAU` and `Omniperf` can be used to do performance analysis. 
 In order to use TAU one only has to load the modules needed to run the application be ran and set the paths to the TAU install folder:
@@ -356,10 +378,42 @@ In order to use TAU one only has to load the modules needed to run the applicati
 export TAU=/project/project_465000536/appl/tau/2.32/craycnl
 export PATH=$TAU/bin:$PATH
 ```
-In order to use omniperf load the follwoing modules:
+Profiling mpi code:
+```
+srun --cpus-per-task=1 --account=project_465000536 --nodes=1 --ntasks-per-node=4 --partition=standard --time=00:05:00 --reservation=summerschool_standard tau_exec -ebs ./mandelbrot
+```
+In order to to see the `paraprof` in browser use `vnc`:
+```
+module load lumi-vnc
+start-vnc
+```
+Visualize:
+```
+paraprof
+```
+Tracing:
+
+```
+export TAU_TRACE=1
+srun --cpus-per-task=1 --account=project_465000536 --nodes=1 --ntasks-per-node=4 --partition=standard --time=00:05:00 --reservation=summerschool_standard tau_exec -ebs ./mandelbrot
+tau_treemerge.pl
+tau_trace2json tau.trc tau.edf -chrome -ignoreatomic -o app.json
+```
+
+Copy `app.json`  to local computer, open ui.perfett.dev and then load the `app.json` file.
+## Omniperf
+```
+https://amdresearch.github.io/omniperf/installation.html#client-side-installation
+```
+In order to use omniperf load the following modules:
 ```
 module use /project/project_465000536/Omni/omniperf/modulefiles
 module load omniperf
 module load cray-python
-``` 
+srun -p standard-g --gpus 1 -N 1 -n 1 -c 1 --time=00:30:00 --account=project_465000536 omniperf profile -n workload_xy --roof-only --kernel-names  -- ./heat_hip
+omniperf analyze -p workloads/workload_xy/mi200/ > analyse_xy.txt
+```
+In additition to this one has to load the usual modules for running GPUs. Keep in mind the the above installation was done with `rocm/5.3.3`.
+It is useful add to the compilation of the application to be analysed the follwing `-g -gdwarf-4`.
+
 More information about TAU can be found in [TAU User Documentation](https://www.cs.uoregon.edu/research/tau/docs/newguide/), while for Omniperf at [Omniperf User Documentation](https://github.com/AMDResearch/omniperf)
